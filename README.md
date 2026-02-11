@@ -46,6 +46,7 @@ https://github.com/user-attachments/assets/e16c3681-f285-4850-b774-583d462ea997
         -   Arduino Pin 10 (RX) -> Roomba TX
         -   Arduino Pin 11 (TX) -> Roomba RX
         -   GND同士を接続
+
 https://cdn-shop.adafruit.com/datasheets/create_2_Open_Interface_Spec.pdf
 <img width="979" height="613" alt="image" src="https://github.com/user-attachments/assets/56ad4e00-7d28-4523-93fc-0b017687a04d" />
 
