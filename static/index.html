@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Roomba Controller</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Roomba Remote</h1>
+
+        <div class="connection-panel">
+            <select id="port-select">
+                <option value="" disabled selected>Select Port</option>
+            </select>
+            <button id="connect-btn" class="btn-connect">Connect</button>
+        </div>
+
+        <div id="status" class="status">Disconnected</div>
+
+        <div class="control-pad">
+            <div class="row">
+                <button class="btn-control" data-cmd="forward">
+                    <span class="material-icons">arrow_upward</span>
+                </button>
+            </div>
+            <div class="row">
+                <button class="btn-control" data-cmd="left">
+                    <span class="material-icons">arrow_back</span>
+                </button>
+                <div class="spacer"></div>
+                <button class="btn-control" data-cmd="right">
+                    <span class="material-icons">arrow_forward</span>
+                </button>
+            </div>
+            <div class="row">
+                <button class="btn-control" data-cmd="back">
+                    <span class="material-icons">arrow_downward</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="stop-panel">
+            <button class="btn-stop" data-cmd="stop">STOP</button>
+        </div>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+
+</html>
