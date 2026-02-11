@@ -24,7 +24,7 @@ app.add_middleware(
 ser: Optional[serial.Serial] = None
 
 class ConnectionConfig(BaseModel):
-    port: str = "/dev/cu.usbmodem101"
+    port: str = "/dev/ttyACM0"
     baud_rate: int = 9600
 
 def get_serial_ports():

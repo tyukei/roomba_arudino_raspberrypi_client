@@ -1,0 +1,17 @@
+[Unit]
+Description=Roomba FastAPI Controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=dialout
+WorkingDirectory=/home/pi/Documents/roomba_arudino_raspberrypi_client
+ExecStart=/home/pi/Documents/roomba_arudino_raspberrypi_client/.venv/bin/python /home/pi/Documents/roomba_arudino_raspberrypi_client/roomba_api.py
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

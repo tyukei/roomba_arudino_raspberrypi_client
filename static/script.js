@@ -17,7 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 portSelect.add(option);
             } else {
                 let defaultFound = false;
-                const defaultPort = "/dev/cu.usbmodem101";
+                const preferredPorts = ["/dev/ttyACM0", "/dev/ttyUSB0"];
+                const defaultPort = preferredPorts.find(p => data.ports.includes(p)) || data.ports[0];
 
                 data.ports.forEach(port => {
                     const option = document.createElement('option');
@@ -30,13 +31,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     portSelect.add(option);
                 });
 
-                // If default port is not in the list, add it anyway and select it
-                if (!defaultFound) {
-                    const option = document.createElement('option');
-                    option.value = defaultPort;
-                    option.text = defaultPort + " (Default)";
-                    option.selected = true;
-                    portSelect.add(option);
+                // If preferred default was not selected above, select first available
+                if (!defaultFound && portSelect.options.length > 0) {
+                    portSelect.selectedIndex = 0;
                 }
             }
         })
