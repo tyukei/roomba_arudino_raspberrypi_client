@@ -2,6 +2,10 @@
 
 このプロジェクトは、Arduinoを使用してRoombaを制御するためのシステムです。REST APIまたはCLI経由でRoombaを操作できます。
 
+https://github.com/user-attachments/assets/e16c3681-f285-4850-b774-583d462ea997
+
+
+
 ## 概要
 
 本システムは、以下のコンポーネントで構成されています。
