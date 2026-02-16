@@ -22,32 +22,55 @@
 
         <div id="status" class="status">Disconnected</div>
 
+        <!-- Mode selector -->
+        <div class="mode-selector">
+            <button id="mode-manual" class="mode-btn active">Manual</button>
+            <button id="mode-auto" class="mode-btn">Auto (AI)</button>
+        </div>
+
         <div class="camera-panel">
             <h2>Camera View</h2>
             <img id="camera-feed" src="/camera/stream" alt="USB camera live feed">
             <div id="camera-status" class="camera-status">Starting camera...</div>
         </div>
 
-        <div class="control-pad">
-            <div class="row">
-                <button class="btn-control" data-cmd="forward">
-                    <span class="material-icons">arrow_upward</span>
-                </button>
+        <!-- Manual control panel -->
+        <div id="manual-panel">
+            <div class="control-pad">
+                <div class="row">
+                    <button class="btn-control" data-cmd="forward">
+                        <span class="material-icons">arrow_upward</span>
+                    </button>
+                </div>
+                <div class="row">
+                    <button class="btn-control" data-cmd="left">
+                        <span class="material-icons">arrow_back</span>
+                    </button>
+                    <div class="spacer"></div>
+                    <button class="btn-control" data-cmd="right">
+                        <span class="material-icons">arrow_forward</span>
+                    </button>
+                </div>
+                <div class="row">
+                    <button class="btn-control" data-cmd="back">
+                        <span class="material-icons">arrow_downward</span>
+                    </button>
+                </div>
             </div>
-            <div class="row">
-                <button class="btn-control" data-cmd="left">
-                    <span class="material-icons">arrow_back</span>
-                </button>
-                <div class="spacer"></div>
-                <button class="btn-control" data-cmd="right">
-                    <span class="material-icons">arrow_forward</span>
-                </button>
+        </div>
+
+        <!-- Auto pilot panel -->
+        <div id="auto-panel" style="display:none;">
+            <div class="auto-controls">
+                <select id="model-select">
+                    <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                    <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
+                    <option value="gemini-robotics-er-1.5-preview">gemini-robotics-er-1.5</option>
+                </select>
+                <button id="auto-start-btn" class="btn-auto-start">Start AI</button>
             </div>
-            <div class="row">
-                <button class="btn-control" data-cmd="back">
-                    <span class="material-icons">arrow_downward</span>
-                </button>
-            </div>
+            <div id="auto-status" class="auto-status">AI stopped</div>
+            <div id="ai-log" class="ai-log"></div>
         </div>
 
         <div class="stop-panel">

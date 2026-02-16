@@ -15,6 +15,8 @@ try:
 except Exception:
     cv2 = None
 
+from auto_pilot import AutoPilot
+
 app = FastAPI(title="Roomba Serial API")
 
 # Add CORS middleware
@@ -118,6 +120,7 @@ class UsbCameraStreamer:
 
 
 camera = UsbCameraStreamer()
+autopilot = AutoPilot()
 
 class ConnectionConfig(BaseModel):
     port: str = "/dev/ttyACM0"
@@ -245,6 +248,67 @@ def camera_stream():
         camera.frame_generator(),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
+
+# ---------- Autopilot helpers ----------
+
+def _get_camera_frame():
+    """Return the latest JPEG frame bytes from the camera."""
+    with camera.lock:
+        return camera.last_frame
+
+
+def _send_serial_command(cmd: str):
+    """Send a movement command over the serial port."""
+    global ser
+    command_map = {
+        "forward": b'0',
+        "right": b'1',
+        "left": b'2',
+        "back": b'3',
+        "stop": b's',
+    }
+    if ser and ser.is_open and cmd in command_map:
+        ser.write(command_map[cmd])
+
+
+class AutopilotConfig(BaseModel):
+    interval: float = 3.0
+    model: str = "gemini-2.0-flash"
+
+
+@app.post("/autopilot/start")
+def start_autopilot(config: AutopilotConfig = AutopilotConfig()):
+    if autopilot.running:
+        return {"status": "already_running"}
+
+    if not camera.running:
+        try:
+            camera.start()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Camera error: {e}")
+
+    try:
+        autopilot.start(
+            get_frame_fn=_get_camera_frame,
+            send_command_fn=_send_serial_command,
+            interval=config.interval,
+            model=config.model,
+        )
+        return {"status": "started", "interval": config.interval, "model": config.model}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/autopilot/stop")
+def stop_autopilot():
+    autopilot.stop()
+    return {"status": "stopped"}
+
+
+@app.get("/autopilot/status")
+def autopilot_status():
+    return autopilot.status()
+
 
 # Serve static files
 app.mount("/static", StaticFiles(directory="static"), name="static")

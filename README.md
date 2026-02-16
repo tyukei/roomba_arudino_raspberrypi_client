@@ -182,6 +182,35 @@ Roomba Open Interface (OI) 仕様に基づき、バイナリデータを送信�
 
 本システムはRaspberry Pi上での動作を想定しており、`systemd` を使用してAPIサーバーを自動起動する構成になっています。
 
+### スマートフォンからアクセスするためのIP確認方法
+
+1. Raspberry PiでIPアドレスを確認します。
+
+```bash
+hostname -I
+```
+
+2. 表示された最初のIPアドレスを使って、スマートフォンのブラウザで開きます（同じWi-Fiに接続していること）。
+
+```text
+http://<RaspberryPiのIP>:8000/
+```
+
+例:
+
+```text
+http://192.168.1.45:8000/
+```
+
+3. 接続できない場合は、以下を確認します。
+
+- スマートフォンとRaspberry Piが同じWi-Fiネットワークに接続されている
+- APIサービスが起動している
+
+```bash
+sudo systemctl status roomba-api
+```
+
 ### systemd サービスの設定
 
 同梱の `roomba-api.service` を使用してサービスを登録します。
