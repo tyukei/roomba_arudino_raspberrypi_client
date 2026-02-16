@@ -39,13 +39,13 @@ class UsbCameraStreamer:
         self.thread = None
         self.last_frame = None
         self.lock = threading.Lock()
-        self.device = 0
+        self.device = 1
         self.width = 640
         self.height = 480
         self.fps = 15
         self.quality = 70
 
-    def start(self, device: int = 0, width: int = 640, height: int = 480, fps: int = 15, quality: int = 70):
+    def start(self, device: int = 1, width: int = 640, height: int = 480, fps: int = 15, quality: int = 70):
         if cv2 is None:
             raise RuntimeError("OpenCV (cv2) is not installed. Install opencv-python.")
 
@@ -201,7 +201,7 @@ def send_command(cmd_type: str):
 
 
 @app.post("/camera/start")
-def start_camera(device: int = 0, width: int = 640, height: int = 480, fps: int = 15, quality: int = 70):
+def start_camera(device: int = 1, width: int = 640, height: int = 480, fps: int = 15, quality: int = 70):
     try:
         camera.start(device=device, width=width, height=height, fps=fps, quality=quality)
         return {
