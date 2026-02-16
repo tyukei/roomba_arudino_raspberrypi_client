@@ -273,7 +273,7 @@ def _send_serial_command(cmd: str):
 
 class AutopilotConfig(BaseModel):
     interval: float = 3.0
-    model: str = "gemini-2.0-flash"
+    model: str = "gemini-robotics-er-1.5-preview"
 
 
 @app.post("/autopilot/start")

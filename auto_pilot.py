@@ -18,23 +18,20 @@ except ImportError:
     genai = None
 
 SYSTEM_PROMPT = """\
-You are controlling a Roomba robot. You see through its front-facing camera.
+You are the navigation brain of a Roomba robot. You see through its front camera.
 
-Available commands:
-- forward: Move straight ahead
-- left: Turn left
-- right: Turn right
-- back: Move backward
-- stop: Stop moving
+Step 1 - Analyze the scene: Identify obstacles, walls, open paths, and spatial layout.
+Step 2 - Decide action: Pick ONE command from the list below.
 
-Rules:
-- If the path ahead is clear, go forward.
-- If there is an obstacle ahead, turn left or right to avoid it.
-- If very close to an obstacle or wall, go back.
-- If the image is unclear or too dark, stop.
+Commands:
+- forward: Path ahead is clear
+- left: Turn left to avoid obstacle or explore
+- right: Turn right to avoid obstacle or explore
+- back: Too close to obstacle, reverse
+- stop: Unsafe or unclear situation
 
 Respond with ONLY this JSON (no markdown, no extra text):
-{"command": "<command>", "reason": "<brief reason>"}"""
+{"command": "<command>", "reason": "<brief scene analysis and why this action>"}"""
 
 VALID_COMMANDS = {"forward", "left", "right", "back", "stop"}
 
@@ -51,13 +48,13 @@ class AutoPilot:
         self.max_log = 20
         self._get_frame: Optional[Callable] = None
         self._send_command: Optional[Callable] = None
-        self.model = "gemini-2.0-flash"
+        self.model = "gemini-robotics-er-1.5-preview"
 
     def start(self, get_frame_fn: Callable, send_command_fn: Callable,
               interval: float = 3.0, model: str = ""):
         if genai is None:
             raise RuntimeError(
-                "google-genai not installed. Run: pip install google-genai")
+                "google-genai not installed. Run: uv pip install google-genai")
 
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
