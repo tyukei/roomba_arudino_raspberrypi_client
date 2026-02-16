@@ -2,6 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const portSelect = document.getElementById('port-select');
     const connectBtn = document.getElementById('connect-btn');
     const statusDiv = document.getElementById('status');
+    const cameraFeed = document.getElementById('camera-feed');
+    const cameraStatus = document.getElementById('camera-status');
     const controlButtons = document.querySelectorAll('.btn-control, .btn-stop');
 
     // Load available ports on startup
@@ -41,6 +43,30 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error fetching ports:', err);
             statusDiv.textContent = 'Error fetching ports';
         });
+
+    // Camera status helpers
+    fetch('/camera/status')
+        .then(response => response.json())
+        .then(data => {
+            if (!data.opencv_installed) {
+                cameraStatus.textContent = 'Camera unavailable: install opencv-python';
+            } else if (data.running) {
+                cameraStatus.textContent = `Live (${data.width}x${data.height} @ ${data.fps}fps)`;
+            } else {
+                cameraStatus.textContent = 'Starting camera...';
+            }
+        })
+        .catch(() => {
+            cameraStatus.textContent = 'Camera status unavailable';
+        });
+
+    cameraFeed.addEventListener('load', () => {
+        cameraStatus.textContent = 'Live';
+    });
+
+    cameraFeed.addEventListener('error', () => {
+        cameraStatus.textContent = 'Camera stream error. Check /dev/video0';
+    });
 
     // Handle connection
     connectBtn.addEventListener('click', () => {

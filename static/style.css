@@ -90,6 +90,33 @@ select {
     color: #666;
 }
 
+.camera-panel {
+    margin-bottom: 14px;
+}
+
+.camera-panel h2 {
+    margin: 0 0 8px 0;
+    font-size: 0.95rem;
+    color: #444;
+    text-align: left;
+}
+
+#camera-feed {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #d9dee3;
+    background: #111;
+}
+
+.camera-status {
+    margin-top: 6px;
+    font-size: 0.78rem;
+    color: #666;
+    text-align: left;
+}
+
 /* Control Pad */
 .control-pad {
     display: flex;

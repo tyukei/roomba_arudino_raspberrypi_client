@@ -6,8 +6,14 @@ from pydantic import BaseModel
 from typing import Optional
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 import os
+import threading
+
+try:
+    import cv2
+except Exception:
+    cv2 = None
 
 app = FastAPI(title="Roomba Serial API")
 
@@ -22,6 +28,96 @@ app.add_middleware(
 
 # Global serial connection
 ser: Optional[serial.Serial] = None
+
+
+class UsbCameraStreamer:
+    def __init__(self):
+        self.cap = None
+        self.running = False
+        self.thread = None
+        self.last_frame = None
+        self.lock = threading.Lock()
+        self.device = 0
+        self.width = 640
+        self.height = 480
+        self.fps = 15
+        self.quality = 70
+
+    def start(self, device: int = 0, width: int = 640, height: int = 480, fps: int = 15, quality: int = 70):
+        if cv2 is None:
+            raise RuntimeError("OpenCV (cv2) is not installed. Install opencv-python.")
+
+        self.device = device
+        self.width = width
+        self.height = height
+        self.fps = fps
+        self.quality = max(30, min(90, quality))
+
+        if self.running:
+            return
+
+        self.cap = cv2.VideoCapture(self.device)
+        if not self.cap.isOpened():
+            self.cap = None
+            raise RuntimeError(f"Cannot open camera device /dev/video{self.device}")
+
+        # Ask camera for MJPEG + lower resolution/fps to reduce CPU load on Pi.
+        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+        self.cap.set(cv2.CAP_PROP_FPS, self.fps)
+
+        self.running = True
+        self.thread = threading.Thread(target=self._capture_loop, daemon=True)
+        self.thread.start()
+
+    def stop(self):
+        self.running = False
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=1.0)
+        self.thread = None
+
+        if self.cap:
+            self.cap.release()
+        self.cap = None
+
+        with self.lock:
+            self.last_frame = None
+
+    def _capture_loop(self):
+        while self.running and self.cap:
+            ok, frame = self.cap.read()
+            if not ok:
+                time.sleep(0.05)
+                continue
+
+            ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), self.quality])
+            if not ok:
+                continue
+
+            with self.lock:
+                self.last_frame = buf.tobytes()
+
+            # Keep feed lightweight.
+            time.sleep(1.0 / max(1, self.fps))
+
+    def frame_generator(self):
+        while self.running:
+            with self.lock:
+                frame = self.last_frame
+
+            if frame:
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
+                )
+            else:
+                time.sleep(0.05)
+
+            time.sleep(0.005)
+
+
+camera = UsbCameraStreamer()
 
 class ConnectionConfig(BaseModel):
     port: str = "/dev/ttyACM0"
@@ -99,6 +195,56 @@ def send_command(cmd_type: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/camera/start")
+def start_camera(device: int = 0, width: int = 640, height: int = 480, fps: int = 15, quality: int = 70):
+    try:
+        camera.start(device=device, width=width, height=height, fps=fps, quality=quality)
+        return {
+            "status": "started",
+            "device": device,
+            "width": width,
+            "height": height,
+            "fps": fps,
+            "quality": camera.quality,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/camera/stop")
+def stop_camera():
+    camera.stop()
+    return {"status": "stopped"}
+
+
+@app.get("/camera/status")
+def camera_status():
+    return {
+        "running": camera.running,
+        "device": camera.device,
+        "width": camera.width,
+        "height": camera.height,
+        "fps": camera.fps,
+        "quality": camera.quality,
+        "opencv_installed": cv2 is not None,
+    }
+
+
+@app.get("/camera/stream")
+def camera_stream():
+    if not camera.running:
+        # Auto-start with lightweight defaults.
+        try:
+            camera.start()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    return StreamingResponse(
+        camera.frame_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
 
 # Serve static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
