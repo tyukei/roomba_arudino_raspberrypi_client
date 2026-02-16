@@ -12,6 +12,7 @@ ExecStart=/home/pi/Documents/roomba_arudino_raspberrypi_client/.venv/bin/python 
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
+Environment=GEMINI_API_KEY=your_key_here
 
 [Install]
 WantedBy=multi-user.target
