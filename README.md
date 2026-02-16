@@ -55,7 +55,7 @@ https://cdn-shop.adafruit.com/datasheets/create_2_Open_Interface_Spec.pdf
     必要なライブラリをインストールします。
 
     ```bash
-    pip install fastapi uvicorn pyserial pydantic
+    pip install fastapi uvicorn pyserial pydantic opencv-python-headless
     ```
 
 ## 使用方法
@@ -78,6 +78,52 @@ python roomba_api.py
 ```
 ブラウザで [http://localhost:8000](http://localhost:8000) にアクセスすると操作画面が表示されます。
 APIドキュメントは [http://localhost:8000/docs](http://localhost:8000/docs) で確認できます。
+
+### USBカメラ表示 (Raspberry Pi 4)
+
+USBカメラを接続すると、Web UI上でライブ映像を確認できます。
+
+-   カメラ映像ページ: [http://localhost:8000](http://localhost:8000)
+-   直接ストリーム: [http://localhost:8000/camera/stream](http://localhost:8000/camera/stream)
+
+本プロジェクトのデフォルト設定は、Raspberry Pi 4向けに軽量と画質のバランスを取っています。
+
+-   解像度: `640x480`
+-   FPS: `15`
+-   JPEG品質: `70`
+
+#### カメラAPIエンドポイント
+
+-   `GET /camera/status`: カメラ状態確認
+-   `POST /camera/start?device=0&width=640&height=480&fps=15&quality=70`: カメラ開始
+-   `POST /camera/stop`: カメラ停止
+-   `GET /camera/stream`: MJPEGライブストリーム
+
+#### カメラ動作テスト例
+
+```bash
+curl -X POST "http://127.0.0.1:8000/camera/start?device=0&width=640&height=480&fps=15&quality=70"
+curl "http://127.0.0.1:8000/camera/status"
+```
+
+#### トラブルシュート
+
+-   `ERROR: [Errno 98] ... address already in use`
+    -   既に `roomba-api.service` が `8000` 番ポートで起動中です。
+    -   サービスを使う場合:
+        ```bash
+        sudo systemctl restart roomba-api
+        sudo systemctl status roomba-api
+        ```
+    -   手動で別ポート起動する場合:
+        ```bash
+        uvicorn roomba_api:app --host 0.0.0.0 --port 8001
+        ```
+
+-   カメラデバイス確認:
+    ```bash
+    ls -l /dev/video*
+    ```
 
 ## 技術的詳細 / アーキテクチャ
 
