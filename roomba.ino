@@ -11,11 +11,24 @@ void setup() {
   Serial.println("Commands: 0=forward, 1=right, 2=left, 3=back, other=stop");
 
   // Roombaを確実に起動モードにする
-  delay(100);
+  delay(1000);       // Roombaの起動を待つ
   device.write(128); // Start
+  delay(500);
+  device.write(131); // Safe mode
+  delay(500);
+
+  // 通信確認: 起動時にビープ音を鳴らす
+  device.write(140); // Define Song
+  device.write(0);   // Song slot 0
+  device.write(2);   // 2 notes
+  device.write(72);  // C5
+  device.write(16);
+  device.write(76);  // E5
+  device.write(16);
   delay(100);
-  device.write(132); // FULL mode
-  delay(100);
+  device.write(141); // Play Song
+  device.write(0);
+
   Serial.println("Roomba initialized!");
 }
 
@@ -33,19 +46,19 @@ void loop() {
     switch (cmd) {
     case 48: // '0'
       Serial.println("-> Moving forward");
-      motor(64, 64);
+      motor(200, 200);
       break;
     case 49: // '1'
       Serial.println("-> Turning right");
-      motor(64, -64);
+      motor(200, -200);
       break;
     case 50: // '2'
       Serial.println("-> Turning left");
-      motor(-64, 64);
+      motor(-200, 200);
       break;
     case 51: // '3'
       Serial.println("-> Moving back");
-      motor(-64, -64);
+      motor(-200, -200);
       break;
     default:
       Serial.println("-> Stopping");
@@ -62,17 +75,12 @@ void loop() {
 }
 
 void motor(int l, int r) {
-  // デバッグ: モーター値を表示
   Serial.print("Motor values - Left: ");
   Serial.print(l);
   Serial.print(", Right: ");
   Serial.println(r);
 
-  for (int i = 0; i < 10; i++) {
-    byte buffer[] = {byte(128), // Start
-                     byte(132), // FULL
-                     byte(146), // Drive PWM
-                     byte(r >> 8), byte(r), byte(l >> 8), byte(l)};
-    device.write(buffer, 7);
-  }
+  byte buffer[] = {byte(146), // Drive PWM
+                   byte(r >> 8), byte(r), byte(l >> 8), byte(l)};
+  device.write(buffer, 5);
 }

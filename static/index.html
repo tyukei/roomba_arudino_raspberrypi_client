@@ -17,6 +17,7 @@
             <select id="port-select">
                 <option value="" disabled selected>Select Port</option>
             </select>
+            <button id="refresh-ports-btn" class="btn-refresh" title="Refresh ports">↺</button>
             <button id="connect-btn" class="btn-connect">Connect</button>
         </div>
 
@@ -32,6 +33,16 @@
             <h2>Camera View</h2>
             <img id="camera-feed" src="/camera/stream" alt="USB camera live feed">
             <div id="camera-status" class="camera-status">Starting camera...</div>
+            <div class="camera-device-panel">
+                <label for="camera-device-select">Camera:</label>
+                <select id="camera-device-select">
+                    <option value="0">device 0</option>
+                    <option value="1">device 1</option>
+                    <option value="2">device 2</option>
+                    <option value="3">device 3</option>
+                </select>
+                <button id="camera-switch-btn" class="btn-camera-switch">Switch</button>
+            </div>
         </div>
 
         <!-- Manual control panel -->

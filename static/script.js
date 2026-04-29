@@ -1,9 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
     const portSelect = document.getElementById('port-select');
+    const refreshPortsBtn = document.getElementById('refresh-ports-btn');
     const connectBtn = document.getElementById('connect-btn');
     const statusDiv = document.getElementById('status');
     const cameraFeed = document.getElementById('camera-feed');
     const cameraStatus = document.getElementById('camera-status');
+    const cameraDeviceSelect = document.getElementById('camera-device-select');
+    const cameraSwitchBtn = document.getElementById('camera-switch-btn');
     const controlButtons = document.querySelectorAll('.btn-control, .btn-stop');
 
     // Mode elements
@@ -21,33 +24,47 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentMode = 'manual'; // 'manual' or 'auto'
     let autoPollingId = null;
 
-    // Load available ports on startup
-    fetch('/ports')
-        .then(response => response.json())
-        .then(data => {
-            portSelect.innerHTML = "";
+    function loadPorts() {
+        refreshPortsBtn.textContent = '…';
+        fetch('/ports')
+            .then(response => response.json())
+            .then(data => {
+                const prev = portSelect.value;
+                portSelect.innerHTML = "";
 
-            if (data.ports.length === 0) {
-                const option = document.createElement('option');
-                option.text = "No ports found";
-                portSelect.add(option);
-            } else {
-                const preferredPorts = ["/dev/ttyACM0", "/dev/ttyUSB0"];
-                const defaultPort = preferredPorts.find(p => data.ports.includes(p)) || data.ports[0];
-
-                data.ports.forEach(port => {
+                if (data.ports.length === 0) {
                     const option = document.createElement('option');
-                    option.value = port;
-                    option.text = port;
-                    if (port === defaultPort) option.selected = true;
+                    option.text = "No ports found";
                     portSelect.add(option);
-                });
-            }
-        })
-        .catch(err => {
-            console.error('Error fetching ports:', err);
-            statusDiv.textContent = 'Error fetching ports';
-        });
+                } else {
+                    const isWindows = data.ports.some(p => /^COM\d+$/i.test(p));
+                    const preferredPorts = isWindows
+                        ? ["COM3", "COM4", "COM5", "COM6"]
+                        : ["/dev/ttyACM0", "/dev/ttyUSB0"];
+                    const defaultPort = prev && data.ports.includes(prev)
+                        ? prev
+                        : (preferredPorts.find(p => data.ports.includes(p)) || data.ports[0]);
+
+                    data.ports.forEach(port => {
+                        const option = document.createElement('option');
+                        option.value = port;
+                        option.text = port;
+                        if (port === defaultPort) option.selected = true;
+                        portSelect.add(option);
+                    });
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching ports:', err);
+                statusDiv.textContent = 'Error fetching ports';
+            })
+            .finally(() => {
+                refreshPortsBtn.textContent = '↺';
+            });
+    }
+
+    loadPorts();
+    refreshPortsBtn.addEventListener('click', loadPorts);
 
     // Camera status
     fetch('/camera/status')
@@ -67,6 +84,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cameraFeed.addEventListener('load', () => { cameraStatus.textContent = 'Live'; });
     cameraFeed.addEventListener('error', () => { cameraStatus.textContent = 'Camera stream error'; });
+
+    // Camera status から現在のデバイス番号をセレクターに反映
+    fetch('/camera/status')
+        .then(r => r.json())
+        .then(data => {
+            if (cameraDeviceSelect) cameraDeviceSelect.value = String(data.device ?? 0);
+        })
+        .catch(() => {});
+
+    // カメラ切り替え
+    if (cameraSwitchBtn) {
+        cameraSwitchBtn.addEventListener('click', () => {
+            const device = parseInt(cameraDeviceSelect.value, 10);
+            cameraSwitchBtn.disabled = true;
+            cameraStatus.textContent = `Switching to device ${device}...`;
+
+            fetch('/camera/stop', { method: 'POST' })
+                .then(() => fetch(`/camera/start?device=${device}`, { method: 'POST' }))
+                .then(r => r.json())
+                .then(() => {
+                    // ストリームURLにtimestampを付けて再読み込み
+                    cameraFeed.src = `/camera/stream?t=${Date.now()}`;
+                    cameraStatus.textContent = `Live (device ${device})`;
+                })
+                .catch(err => {
+                    cameraStatus.textContent = `Switch failed: ${err.message}`;
+                })
+                .finally(() => {
+                    cameraSwitchBtn.disabled = false;
+                });
+        });
+    }
 
     // ---------- Mode switching ----------
     modeManualBtn.addEventListener('click', () => switchMode('manual'));
@@ -112,7 +161,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ port: selectedPort, baud_rate: 9600 }),
             })
                 .then(response => {
-                    if (!response.ok) throw new Error('Connection failed');
+                    if (!response.ok) {
+                        return response.json().then(body => {
+                            throw new Error(body.detail || 'Connection failed');
+                        });
+                    }
                     return response.json();
                 })
                 .then(data => {
@@ -123,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
                 .catch(err => {
                     console.error(err);
-                    statusDiv.textContent = 'Connection failed';
+                    statusDiv.textContent = `Error: ${err.message}`;
                 });
         }
     });
@@ -139,14 +192,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             sendCommand(cmd);
-        });
+        }, { passive: false });
 
         btn.addEventListener('touchend', (e) => {
             e.preventDefault();
             if (currentMode === 'manual' && cmd !== 'stop') sendCommand('stop');
-        });
+        }, { passive: false });
 
-        btn.addEventListener('mousedown', () => {
+        btn.addEventListener('mousedown', (e) => {
+            if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
             if (cmd === 'stop' && currentMode === 'auto') {
                 stopAutopilot();
                 return;
@@ -154,7 +208,8 @@ document.addEventListener('DOMContentLoaded', () => {
             sendCommand(cmd);
         });
 
-        btn.addEventListener('mouseup', () => {
+        btn.addEventListener('mouseup', (e) => {
+            if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
             if (currentMode === 'manual' && cmd !== 'stop') sendCommand('stop');
         });
 
@@ -171,8 +226,19 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         fetch(`/command/${cmd}`, { method: 'POST' })
-            .then(response => response.json())
-            .then(data => console.log('Sent:', data))
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(body => {
+                        const msg = body.detail || 'Command error';
+                        statusDiv.textContent = `Error: ${msg}`;
+                        connectBtn.textContent = 'Connect';
+                        connectBtn.classList.remove('connected');
+                        portSelect.disabled = false;
+                        console.error('Command failed:', msg);
+                    });
+                }
+                return response.json().then(data => console.log('Sent:', data));
+            })
             .catch(err => console.error('Error sending command:', err));
     }
 
