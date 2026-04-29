@@ -17,7 +17,7 @@ try:
 except ImportError:
     genai = None
 
-SYSTEM_PROMPT = """\
+PROMPT_FREE = """\
 You are the navigation brain of a Roomba robot. You see through its front camera.
 
 Step 1 - Analyze the scene: Identify obstacles, walls, open paths, and spatial layout.
@@ -32,6 +32,24 @@ Commands:
 
 Respond with ONLY this JSON (no markdown, no extra text):
 {"command": "<command>", "reason": "<brief scene analysis and why this action>"}"""
+
+PROMPT_GOAL = """\
+You are the navigation brain of a Roomba robot. You see through its front camera.
+Your goal: {goal}
+
+Step 1 - Analyze the scene: What do you see? Is the goal (or path toward it) visible?
+Step 2 - Decide action: Move toward the goal while avoiding obstacles.
+Step 3 - If you have reached the goal, stop.
+
+Commands:
+- forward: Move toward the goal
+- left: Turn left to find or approach the goal
+- right: Turn right to find or approach the goal
+- back: Too close to obstacle, reverse
+- stop: Goal reached OR unsafe situation
+
+Respond with ONLY this JSON (no markdown, no extra text):
+{{"command": "<command>", "reason": "<what you see and progress toward goal>"}}"""
 
 VALID_COMMANDS = {"forward", "left", "right", "back", "stop"}
 
@@ -49,9 +67,12 @@ class AutoPilot:
         self._get_frame: Optional[Callable] = None
         self._send_command: Optional[Callable] = None
         self.model = "gemini-robotics-er-1.5-preview"
+        self.mode = "free"  # "free" or "goal"
+        self.goal = ""
 
     def start(self, get_frame_fn: Callable, send_command_fn: Callable,
-              interval: float = 3.0, model: str = ""):
+              interval: float = 3.0, model: str = "",
+              mode: str = "free", goal: str = ""):
         if genai is None:
             raise RuntimeError(
                 "google-genai not installed. Run: uv pip install google-genai")
@@ -62,6 +83,8 @@ class AutoPilot:
 
         if model:
             self.model = model
+        self.mode = mode if mode in ("free", "goal") else "free"
+        self.goal = goal
         self._get_frame = get_frame_fn
         self._send_command = send_command_fn
         self.interval = max(1.0, interval)
@@ -83,8 +106,14 @@ class AutoPilot:
             except Exception:
                 pass
 
+    def _build_prompt(self):
+        if self.mode == "goal" and self.goal:
+            return PROMPT_GOAL.format(goal=self.goal)
+        return PROMPT_FREE
+
     def _loop(self):
         client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+        prompt = self._build_prompt()
 
         while self.running:
             try:
@@ -99,7 +128,7 @@ class AutoPilot:
                     contents=[
                         types.Part.from_bytes(
                             data=frame_bytes, mime_type="image/jpeg"),
-                        SYSTEM_PROMPT,
+                        prompt,
                     ],
                     config=types.GenerateContentConfig(temperature=0.3),
                 )
@@ -165,6 +194,8 @@ class AutoPilot:
             "running": self.running,
             "interval": self.interval,
             "model": self.model,
+            "mode": self.mode,
+            "goal": self.goal,
             "last_command": self.last_command,
             "last_reason": self.last_reason,
             "last_error": self.last_error,

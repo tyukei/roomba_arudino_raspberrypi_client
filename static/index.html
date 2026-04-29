@@ -72,6 +72,13 @@
 
         <!-- Auto pilot panel -->
         <div id="auto-panel" style="display:none;">
+            <div class="auto-mode-tabs">
+                <button id="auto-free" class="auto-tab active">Free</button>
+                <button id="auto-goal" class="auto-tab">Goal</button>
+            </div>
+            <div id="goal-input-row" class="goal-input-row" style="display:none;">
+                <input id="goal-text" type="text" placeholder='e.g. "go to the kitchen"' class="goal-input">
+            </div>
             <div class="auto-controls">
                 <select id="model-select">
                     <option value="gemini-robotics-er-1.5-preview">robotics-er-1.5 (VLM)</option>

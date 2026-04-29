@@ -270,6 +270,45 @@ select {
     color: white;
 }
 
+/* Auto Sub-mode Tabs */
+.auto-mode-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 8px;
+    border-radius: 5px;
+    overflow: hidden;
+    border: 1px solid #ddd;
+}
+
+.auto-tab {
+    flex: 1;
+    padding: 6px;
+    border: none;
+    background: #f0f0f0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #666;
+}
+
+.auto-tab.active {
+    background: #28a745;
+    color: white;
+}
+
+.goal-input-row {
+    margin-bottom: 8px;
+}
+
+.goal-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 0.85rem;
+    box-sizing: border-box;
+}
+
 /* Auto Panel */
 .auto-controls {
     display: flex;

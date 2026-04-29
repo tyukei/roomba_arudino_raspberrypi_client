@@ -21,8 +21,39 @@ document.addEventListener('DOMContentLoaded', () => {
     const autoStatusDiv = document.getElementById('auto-status');
     const aiLogDiv = document.getElementById('ai-log');
 
+    // Auto sub-mode elements
+    const autoFreeBtn = document.getElementById('auto-free');
+    const autoGoalBtn = document.getElementById('auto-goal');
+    const goalInputRow = document.getElementById('goal-input-row');
+    const goalText = document.getElementById('goal-text');
+
     let currentMode = 'manual'; // 'manual' or 'auto'
+    let autoSubMode = 'free'; // 'free' or 'goal'
     let autoPollingId = null;
+
+    // WebSocket for low-latency control
+    let ws = null;
+
+    function connectWs() {
+        if (ws && ws.readyState === WebSocket.OPEN) return;
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        ws = new WebSocket(`${proto}://${location.host}/ws/control`);
+        ws.addEventListener('close', () => { ws = null; });
+        ws.addEventListener('error', () => { ws = null; });
+    }
+
+    function sendWsCommand(cmd) {
+        if (!connectBtn.classList.contains('connected')) return;
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            connectWs();
+            // fallback to HTTP while WS is connecting
+            fetch(`/command/${cmd}`, { method: 'POST' }).catch(() => {});
+            return;
+        }
+        ws.send(JSON.stringify({ cmd }));
+    }
+
+    connectWs();
 
     function loadPorts() {
         refreshPortsBtn.textContent = '…';
@@ -139,6 +170,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ---------- Auto sub-mode tabs ----------
+    autoFreeBtn.addEventListener('click', () => switchAutoSub('free'));
+    autoGoalBtn.addEventListener('click', () => switchAutoSub('goal'));
+
+    function switchAutoSub(sub) {
+        autoSubMode = sub;
+        autoFreeBtn.classList.toggle('active', sub === 'free');
+        autoGoalBtn.classList.toggle('active', sub === 'goal');
+        goalInputRow.style.display = sub === 'goal' ? '' : 'none';
+    }
+
     // ---------- Connection ----------
     connectBtn.addEventListener('click', () => {
         const selectedPort = portSelect.value;
@@ -173,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     connectBtn.classList.add('connected');
                     statusDiv.textContent = `Connected to ${data.port}`;
                     portSelect.disabled = true;
+                    connectWs();
                 })
                 .catch(err => {
                     console.error(err);
@@ -221,25 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function sendCommand(cmd) {
-        if (!connectBtn.classList.contains('connected')) {
-            console.log(`Command ${cmd} (not connected)`);
-            return;
-        }
-        fetch(`/command/${cmd}`, { method: 'POST' })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(body => {
-                        const msg = body.detail || 'Command error';
-                        statusDiv.textContent = `Error: ${msg}`;
-                        connectBtn.textContent = 'Connect';
-                        connectBtn.classList.remove('connected');
-                        portSelect.disabled = false;
-                        console.error('Command failed:', msg);
-                    });
-                }
-                return response.json().then(data => console.log('Sent:', data));
-            })
-            .catch(err => console.error('Error sending command:', err));
+        sendWsCommand(cmd);
     }
 
     // ---------- Autopilot ----------
@@ -260,12 +285,21 @@ document.addEventListener('DOMContentLoaded', () => {
         autoStatusDiv.textContent = 'Starting AI...';
         autoStartBtn.disabled = true;
 
+        const goal = autoSubMode === 'goal' ? (goalText.value.trim() || '') : '';
+        if (autoSubMode === 'goal' && !goal) {
+            autoStatusDiv.textContent = 'Enter a goal first';
+            autoStartBtn.disabled = false;
+            return;
+        }
+
         fetch('/autopilot/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 interval: 3.0,
                 model: modelSelect.value,
+                mode: autoSubMode,
+                goal: goal,
             }),
         })
             .then(r => r.json())
@@ -324,7 +358,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.running) {
                     autoStartBtn.textContent = 'Stop AI';
                     autoStartBtn.classList.add('running');
-                    let statusText = `AI running | Last: ${data.last_command || '-'}`;
+                    let modeLabel = data.mode === 'goal' ? `Goal: ${data.goal}` : 'Free';
+                    let statusText = `${modeLabel} | Last: ${data.last_command || '-'}`;
                     if (data.last_error) statusText += ` | Err: ${data.last_error}`;
                     autoStatusDiv.textContent = statusText;
                 } else {

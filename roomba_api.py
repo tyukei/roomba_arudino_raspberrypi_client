@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 import serial
 import serial.tools.list_ports
 import time
@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 import os
 import threading
+from dotenv import load_dotenv
+load_dotenv()
 
 try:
     import cv2
@@ -32,6 +34,22 @@ app.add_middleware(
 ser: Optional[serial.Serial] = None
 
 
+def _find_usb_camera() -> str:
+    """Auto-detect USB camera by trying /dev/video0..3 with V4L2 backend."""
+    for idx in range(4):
+        path = f"/dev/video{idx}"
+        if not os.path.exists(path):
+            continue
+        cap = cv2.VideoCapture(path, cv2.CAP_V4L2)
+        if cap.isOpened():
+            # Check it can actually grab a frame
+            ok, _ = cap.read()
+            cap.release()
+            if ok:
+                return path
+    return "/dev/video0"
+
+
 class UsbCameraStreamer:
     def __init__(self):
         self.cap = None
@@ -39,17 +57,17 @@ class UsbCameraStreamer:
         self.thread = None
         self.last_frame = None
         self.lock = threading.Lock()
-        self.device = 1
+        self.device = "/dev/video0"
         self.width = 640
         self.height = 480
         self.fps = 15
         self.quality = 70
 
-    def start(self, device: int = 1, width: int = 640, height: int = 480, fps: int = 15, quality: int = 70):
+    def start(self, device: str = "", width: int = 640, height: int = 480, fps: int = 15, quality: int = 70):
         if cv2 is None:
             raise RuntimeError("OpenCV (cv2) is not installed. Install opencv-python.")
 
-        self.device = device
+        self.device = device if device else _find_usb_camera()
         self.width = width
         self.height = height
         self.fps = fps
@@ -58,10 +76,10 @@ class UsbCameraStreamer:
         if self.running:
             return
 
-        self.cap = cv2.VideoCapture(self.device)
+        self.cap = cv2.VideoCapture(self.device, cv2.CAP_V4L2)
         if not self.cap.isOpened():
             self.cap = None
-            raise RuntimeError(f"Cannot open camera device /dev/video{self.device}")
+            raise RuntimeError(f"Cannot open camera device {self.device}")
 
         # Ask camera for MJPEG + lower resolution/fps to reduce CPU load on Pi.
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
@@ -201,7 +219,7 @@ def send_command(cmd_type: str):
 
 
 @app.post("/camera/start")
-def start_camera(device: int = 1, width: int = 640, height: int = 480, fps: int = 15, quality: int = 70):
+def start_camera(device: str = "", width: int = 640, height: int = 480, fps: int = 15, quality: int = 70):
     try:
         camera.start(device=device, width=width, height=height, fps=fps, quality=quality)
         return {
@@ -274,6 +292,8 @@ def _send_serial_command(cmd: str):
 class AutopilotConfig(BaseModel):
     interval: float = 3.0
     model: str = "gemini-robotics-er-1.5-preview"
+    mode: str = "free"  # "free" or "goal"
+    goal: str = ""
 
 
 @app.post("/autopilot/start")
@@ -293,8 +313,11 @@ def start_autopilot(config: AutopilotConfig = AutopilotConfig()):
             send_command_fn=_send_serial_command,
             interval=config.interval,
             model=config.model,
+            mode=config.mode,
+            goal=config.goal,
         )
-        return {"status": "started", "interval": config.interval, "model": config.model}
+        return {"status": "started", "interval": config.interval,
+                "model": config.model, "mode": config.mode, "goal": config.goal}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -308,6 +331,21 @@ def stop_autopilot():
 @app.get("/autopilot/status")
 def autopilot_status():
     return autopilot.status()
+
+
+@app.websocket("/ws/control")
+async def ws_control(ws: WebSocket):
+    await ws.accept()
+    try:
+        while True:
+            data = await ws.receive_json()
+            cmd = data.get("cmd")
+            if cmd:
+                _send_serial_command(cmd)
+    except WebSocketDisconnect:
+        _send_serial_command("stop")
+    except Exception:
+        _send_serial_command("stop")
 
 
 # Serve static files
